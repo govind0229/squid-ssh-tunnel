@@ -1,0 +1,84 @@
+#!/bin/sh
+### Init.d service for manage ssh tunnels
+### Govind Kumar <Govind_sharma@live.com>
+### BEGIN INIT INFO
+
+NAME=ssh-tunnel
+SCRIPT=/root/ssh-tunnel.sh
+RUNAS=root
+
+PIDFILE=/var/run/ssh-tunnel.pid
+LOGFILE=/var/log/ssh-tunnel.log
+
+start() {
+  if [ -f "$PIDFILE" ] && kill -0 $(cat "$PIDFILE"); then
+    echo "* $NAME is already running" >&2
+    return 1
+  fi
+  echo "* Starting $NAME" >&2
+  local CMD="$SCRIPT &> \"$LOGFILE\" & echo \$!"
+  su -c "$CMD" $RUNAS > "$PIDFILE"
+  echo "Started\t\t\t\t\t[OK]" >&2
+}
+
+stop() {
+  if [ ! -f "$PIDFILE" ] || ! kill -0 $(cat "$PIDFILE"); then
+    echo "* $NAME is not running" >&2
+    return 1
+  fi
+  echo "* Stopping $NAME" >&2
+  kill -15 $(cat "$PIDFILE") && rm -f "$PIDFILE"
+  killall ssh
+  echo "Stopped\t\t\t\t\t[OK]" >&2
+}
+
+status() {
+
+  if [ ! -f "$PIDFILE" ]; then
+        echo "* $NAME is not running" >&2
+        return 1
+  fi
+    PID=$(cat "$PIDFILE")
+    CHECK=$(ps aux | grep $PID)
+  if [ ! -z "$CHECK" ]; then
+    echo "* $NAME is running" >&2
+    return 0
+  else
+    echo "* $NAME is not running" >&2
+    return 1
+  fi
+}
+
+uninstall() {
+  echo -n "Are you really sure you want to uninstall this $NAME? That cannot be undone. [yes|No] "
+  local SURE
+  read SURE
+  if [ "$SURE" = "yes" ]; then
+    stop
+    rm -f "$PIDFILE"
+    echo "Notice: log file is not be removed: '$LOGFILE'" >&2
+    update-rc.d -f <NAME> remove
+    rm -fv "$0"
+  fi
+}
+
+case "$1" in
+  start)
+    start
+    ;;
+  stop)
+    stop
+    ;;
+  uninstall)
+    uninstall
+    ;;
+  restart)
+    stop
+    start
+    ;;
+  status)
+    status
+    ;;
+  *)
+    echo "Usage: $0 {start|stop|restart|uninstall}"
+esac
